@@ -77,7 +77,7 @@ const extractPricesFromPage = async (
     await page.waitForSelector('label[for="package-tab-2"]', { visible: true });
     // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
     await page.click('label[for="package-tab-2"]');
-    await page.waitForSelector("span.price-with-tooltip > span.price");
+    await page.waitForSelector(".price-wrapper span.price");
     const standardPrices = await page.$$eval(
       "span.price-with-tooltip > span.price",
       (elements) => elements.map((e) => e.innerText.trim())
