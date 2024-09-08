@@ -60,7 +60,7 @@ const extractPricesFromPage = async (page) => {
 const waitForPressHoldToDisappear = async (page) => {
   let pressHoldExists = true;
   let checkCounter = 0;
-
+  console.log("checking captcha presence");
   while (pressHoldExists) {
     // Ensure the page is fully loaded and idle
     await page.waitForNetworkIdle({ idleTime: 1000, timeout: 0 }); // Remove timeout to wait indefinitely
@@ -115,22 +115,28 @@ const main = async (term, number) => {
       term
     )}&page=${number}`;
     await navigateTo(url);
-    await waitForPressHoldToDisappear(page);
-
+    // await waitForPressHoldToDisappear(page);
+    const pressHoldElement = await page.$('[aria-label="Press & Hold"]');
+    if (pressHoldElement) {
+      console.log(
+        "Element found, possibly need to handle press & hold interaction"
+      );
+    } else {
+      console.log("No Press & Hold element found");
+    }
     // Extract hrefs from gig cards
     console.log(`extracting hrefs...`);
     let hrefs = await page.evaluate(() => {
       return [
         ...document.querySelectorAll(
-          ".gig-card-layout a, .double-card-layout a"
+          ".gig-card-layout a,.double-card-layout a,.basic-gig-card a"
         ),
       ].map((anchor) => anchor.href);
     });
-    hrefs = hrefs.length ? [...new Set(...hrefs)] : [];
+    hrefs = hrefs.length ? [...new Set(hrefs)] : [];
+    console.log(hrefs);
     console.log(
-      `${
-        hrefs.length ? `${hrefs}, hrefs extracted` : `hrefs extraction failed`
-      }`
+      `${hrefs.length ? `✅ hrefs extracted` : `❌ hrefs extraction failed`}`
     );
 
     for (let i = 0; i < hrefs.length; i++) {
@@ -138,9 +144,23 @@ const main = async (term, number) => {
       const href = hrefs[i];
       // Navigate to gig detail page in the same tab
       await navigateTo(href);
-      await waitForPressHoldToDisappear(page);
+
+      const { skipCheck, clickModal, clickCookies } = await page.evaluate(
+        () => {
+          return {
+            skipCheck: !!document.querySelector('[aria-label="Press & Hold"]'),
+            clickCookies: !!document.querySelector("#onetrust-banner-sdk"),
+            clickModal: !!document.querySelector(".modal-content"),
+          };
+        }
+      );
+      if (skipCheck) continue;
+      clickCookies && (await page.click("#onetrust-reject-all-handler"));
+      clickModal && (await page.click(".modal-content-close"));
+      // await waitForPressHoldToDisappear(page);
       await page.waitForNetworkIdle({ idleTime: 1000, timeout: 0 });
-      if (!document.querySelector(".package-content")) continue;
+      const packageContent = page.$(".package-content");
+      if (!packageContent) continue;
       // Wait for 'Press & Hold' to disappear, if applicable
       console.log(`evaluating press and hold presence`);
 
