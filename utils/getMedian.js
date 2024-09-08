@@ -25,8 +25,33 @@ const allPrices = data
 export const report = async () => {
   const data = await readJsonFile();
   for (const key of Object.keys(data)) {
-    const d = data[key].map((price) => +price.match(/\d+/)[0]);
-    const medianOfDate = median(d);
-    console.log(`for ${d.length} records of ${key} median is ${medianOfDate}`);
+    if (Array.isArray(data[key])) {
+      const d = data[key].map((price) => {
+        const refinedPrice = price.replace(",", "");
+        return +refinedPrice.match(/\d+/)[0];
+      });
+      const medianOfDate = median(d);
+      console.log(
+        `for ${d.length} records of ${key} median is ${medianOfDate}`
+      );
+    } else {
+      const standard = data[key]["0"].map((price) => {
+        const refinedPrice = price.replace(",", "");
+        return +refinedPrice.match(/\d+/)[0];
+      });
+      const premium = data[key]["1"].map((price) => {
+        const refinedPrice = price.replace(",", "");
+        return +refinedPrice.match(/\d+/)[0];
+      });
+      const medianOfstandard = median(standard);
+      const medianOfpremium = median(premium);
+      console.log(
+        `for ${standard.length} records of ${key}:standard median is ${medianOfstandard}`
+      );
+      console.log(
+        `for ${premium.length} records of ${key}:premium median is ${medianOfpremium}`
+      );
+    }
   }
 };
+report();

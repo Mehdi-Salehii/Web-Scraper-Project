@@ -79,16 +79,16 @@ const extractPricesFromPage = async (
     await page.click('label[for="package-tab-2"]');
     await page.waitForSelector(".price-wrapper span.price");
     const standardPrices = await page.$$eval(
-      "span.price-with-tooltip > span.price",
+      ".price-wrapper span.price",
       (elements) => elements.map((e) => e.innerText.trim())
     );
     prices.standard.push(...standardPrices);
     // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
     await page.click('label[for="package-tab-3"]');
 
-    await page.waitForSelector("span.price-with-tooltip > span.price");
+    await page.waitForSelector(".price-wrapper span.price");
     const premiumPrices = await page.$$eval(
-      "span.price-with-tooltip > span.price",
+      ".price-wrapper span.price",
       (elements) => elements.map((e) => e.innerText.trim())
     );
     prices.premium.push(...premiumPrices);
