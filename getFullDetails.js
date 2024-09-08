@@ -115,31 +115,34 @@ const main = async (term, number) => {
       term
     )}&page=${number}`;
     await navigateTo(url);
+    await waitForPressHoldToDisappear(page);
 
     // Extract hrefs from gig cards
-    const hrefs = await page.evaluate(() => {
-      console.log(`extracting hrefs...`);
+    console.log(`extracting hrefs...`);
+    let hrefs = await page.evaluate(() => {
       return [
-        ...new Set(
-          Array.from(
-            document.querySelectorAll(
-              ".gig-card-layout a, .double-card-layout a"
-            )
-          ).map((anchor) => anchor.href)
+        ...document.querySelectorAll(
+          ".gig-card-layout a, .double-card-layout a"
         ),
-      ];
+      ].map((anchor) => anchor.href);
     });
+    hrefs = hrefs.length ? [...new Set(...hrefs)] : [];
+    console.log(
+      `${
+        hrefs.length ? `${hrefs}, hrefs extracted` : `hrefs extraction failed`
+      }`
+    );
 
-    for (let i; i < hrefs.length; i++) {
+    for (let i = 0; i < hrefs.length; i++) {
       console.log(`running for ${i + 1} href of ${hrefs.length} hrefs`);
       const href = hrefs[i];
       // Navigate to gig detail page in the same tab
       await navigateTo(href);
+      await waitForPressHoldToDisappear(page);
       await page.waitForNetworkIdle({ idleTime: 1000, timeout: 0 });
       if (!document.querySelector(".package-content")) continue;
       // Wait for 'Press & Hold' to disappear, if applicable
       console.log(`evaluating press and hold presence`);
-      await waitForPressHoldToDisappear(page);
 
       // Extract prices from the gig detail page
       console.log(`getting results for gig`);
