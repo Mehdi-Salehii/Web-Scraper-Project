@@ -6,7 +6,10 @@ import { readJsonFile, writeObjectToFile } from "./utils/db.js";
 import { report } from "./utils/helpers.js"; // Ensure this path is correct
 import { executablePath } from "puppeteer";
 import notification from "./utils/soundEffects.js";
-
+import fs from "fs/promises";
+(async () => {
+  await writeObjectToFile({});
+})();
 puppeteer.use(StealthPlugin());
 
 let finalResult = {};
@@ -34,49 +37,15 @@ const navigateTo = async (page, url) => {
     throw error;
   }
 };
-const reactionToPage = async (
-  page,
-  captchaPresent,
-  clickCookies,
-  clickModal
-) => {
-  if (clickCookies)
-    await page
-      .click("#onetrust-reject-all-handler")
-      .catch((e) => console.error("Cookies handler not found", e));
-  if (clickModal)
-    await page
-      .click(".modal-content-close")
-      .catch((e) => console.error("Modal close button not found", e));
-  while (captchaPresent) {
-    console.log("there is a captcha present ❌");
-    if (clickCookies)
-      await page
-        .click("#onetrust-reject-all-handler")
-        .catch((e) => console.error("Cookies handler not found", e));
-    if (clickModal)
-      await page
-        .click(".modal-content-close")
-        .catch((e) => console.error("Modal close button not found", e));
-    await new Promise((res) => setTimeout(res, 1000 * 60));
-  }
-  console.log("passed from captcha ✅");
-  // if (captchaPresent) continue;
-};
-const extractPricesFromPage = async (
-  page,
-  captchaPresent,
-  clickCookies,
-  clickModal
-) => {
+
+const extractPricesFromPage = async (page) => {
   const prices = { basic: [], standard: [], premium: [] };
 
   try {
     // Extract prices for the standard and premium tiers
     console.log("waiting for package-tab-1");
-    // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
+
     await page.waitForSelector('label[for="package-tab-1"]', { visible: true });
-    // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
 
     await page.waitForSelector(".price-wrapper span.price");
     const basicPrices = await page.$$eval(
@@ -85,7 +54,7 @@ const extractPricesFromPage = async (
     );
     prices.basic.push(...basicPrices);
     await page.waitForSelector('label[for="package-tab-2"]', { visible: true });
-    // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
+
     await page.click('label[for="package-tab-2"]');
     await page.waitForSelector(".price-wrapper span.price");
     const standardPrices = await page.$$eval(
@@ -93,7 +62,7 @@ const extractPricesFromPage = async (
       (elements) => elements.map((e) => e.innerText.trim())
     );
     prices.standard.push(...standardPrices);
-    // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
+
     await page.click('label[for="package-tab-3"]');
 
     await page.waitForSelector(".price-wrapper span.price");
@@ -131,38 +100,18 @@ const main = async (term, number) => {
     const url = `https://www.fiverr.com/search/gigs?query=${encodeURIComponent(
       term
     )}&page=${number}`;
-    // const checkCaptchaInterval = setInterval(async () => {
-    //   const result = await page.evaluate(() => {
-    //     return {
-    //       captchaPresent: !!document.querySelector(
-    //         '[aria-label="Press & Hold"]' ||
-    //           !!document.getElementById("px-captcha")
-    //       ),
-    //       clickCookies: !!document.querySelector("#onetrust-banner-sdk"),
-    //       clickModal: !!document.querySelector(".modal-content"),
-    //     };
-    //   });
 
-    //   // Update the variables
-    //   captchaPresent = result.captchaPresent;
-    //   clickCookies = result.clickCookies;
-    //   clickModal = result.clickModal;
-
-    //   // Log to debug
-    //   console.log(
-    //     `captchaPresent: ${captchaPresent}, clickCookies: ${clickCookies}, clickModal: ${clickModal}`
-    //   );
-    // }, 1000);
     await navigateTo(page, url);
-    // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
+
     // Extract hrefs from gig cards
     console.log(`extracting hrefs...`);
     let hrefs = await page.evaluate(() => {
-      return [
-        ...document.querySelectorAll(
-          ".gig-card-layout a,.double-card-layout a,.basic-gig-card a"
-        ),
-      ].map((anchor) => anchor.href);
+      return [...document.querySelectorAll(".basic-gig-card")]
+        .map((card) =>
+          card.querySelector(`a[aria-label="Go to gig"]
+`)
+        )
+        .map((anchor) => anchor.href);
     });
 
     hrefs = hrefs.length ? [...new Set(hrefs)] : [];
@@ -172,9 +121,17 @@ const main = async (term, number) => {
 
     for (let i = 0; i < hrefs.length; i++) {
       try {
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.random() * 15000 + 15000)
+        );
+
         console.log(`running for ${i + 1} href of ${hrefs.length} hrefs`);
         const href = hrefs[i];
         await navigateTo(page, href);
+        // if (await checkCaptchaPresence(page)) {
+        //   const waitTime = Math.random() * 10 + 10;
+        //   await new Promise((res) => setTimeout(res, waitTime * 1000));
+        // }
         let notifPlayed = false;
         while (await checkCaptchaPresence(page)) {
           !notifPlayed && notification();
@@ -182,7 +139,6 @@ const main = async (term, number) => {
           console.log("captcha is present waiting for 20 seconds ");
           await new Promise((res) => setTimeout(res, 20000));
         }
-        // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
 
         const packageContentExists = await page.$(".package-content");
         if (!packageContentExists) continue;
@@ -217,6 +173,8 @@ const main = async (term, number) => {
         }
 
         console.log(`Finished scraping gig: ${i + 1}`);
+        await writeObjectToFile(finalResult);
+        await report();
       } catch (err) {
         console.error(err);
       }
@@ -226,8 +184,7 @@ const main = async (term, number) => {
       `Extracted prices from page ${number} for "${term}":`,
       finalResult[term]
     );
-    await writeObjectToFile(finalResult);
-    await report();
+
     await browser.close();
     console.log("Browser closed.");
     // clearInterval(checkCaptchaInterval);
@@ -238,10 +195,8 @@ const main = async (term, number) => {
 };
 
 const terms = [
-  "fullstack nextjs",
   "fullstack nextjs app",
   "nextjs",
-  "nextjs developer",
   "nextjs app",
   "fullstack developer",
   "fullstack web developer",
@@ -270,7 +225,12 @@ const terms = [
 const runLoop = async () => {
   for (const term of terms) {
     const dataInDb = await readJsonFile();
+    const completeSummary = await fs.readFile(
+      "./complete-summary.txt",
+      "utf-8"
+    );
     if (!!dataInDb[term]) continue;
+    if (completeSummary.includes(term)) continue;
     for (const i of [1, 2, 3, 4]) {
       await main(term, i);
     }
