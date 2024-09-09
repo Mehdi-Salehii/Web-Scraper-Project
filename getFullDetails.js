@@ -2,9 +2,10 @@ import "dotenv/config";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import randomUserAgent from "random-useragent";
-import { writeObjectToFile } from "./utils/db.js";
-import { report } from "./utils/getMedian.js"; // Ensure this path is correct
+import { readJsonFile, writeObjectToFile } from "./utils/db.js";
+import { report } from "./utils/helpers.js"; // Ensure this path is correct
 import { executablePath } from "puppeteer";
+import notification from "./utils/soundEffects.js";
 
 puppeteer.use(StealthPlugin());
 
@@ -68,12 +69,21 @@ const extractPricesFromPage = async (
   clickCookies,
   clickModal
 ) => {
-  const prices = { standard: [], premium: [] };
+  const prices = { basic: [], standard: [], premium: [] };
 
   try {
     // Extract prices for the standard and premium tiers
-    console.log("waiting for package-tab-2");
+    console.log("waiting for package-tab-1");
     // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
+    await page.waitForSelector('label[for="package-tab-1"]', { visible: true });
+    // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
+
+    await page.waitForSelector(".price-wrapper span.price");
+    const basicPrices = await page.$$eval(
+      ".price-wrapper span.price",
+      (elements) => elements.map((e) => e.innerText.trim())
+    );
+    prices.basic.push(...basicPrices);
     await page.waitForSelector('label[for="package-tab-2"]', { visible: true });
     // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
     await page.click('label[for="package-tab-2"]');
@@ -161,38 +171,55 @@ const main = async (term, number) => {
     );
 
     for (let i = 0; i < hrefs.length; i++) {
-      console.log(`running for ${i + 1} href of ${hrefs.length} hrefs`);
-      const href = hrefs[i];
-      await navigateTo(page, href);
-      while (await checkCaptchaPresence(page)) {
-        console.log("captcha is present waiting for 20 seconds ");
-        await new Promise((res) => setTimeout(res, 20000));
+      try {
+        console.log(`running for ${i + 1} href of ${hrefs.length} hrefs`);
+        const href = hrefs[i];
+        await navigateTo(page, href);
+        let notifPlayed = false;
+        while (await checkCaptchaPresence(page)) {
+          !notifPlayed && notification();
+          notifPlayed = true;
+          console.log("captcha is present waiting for 20 seconds ");
+          await new Promise((res) => setTimeout(res, 20000));
+        }
+        // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
+
+        const packageContentExists = await page.$(".package-content");
+        if (!packageContentExists) continue;
+
+        console.log(`getting results for gig`);
+        const { basic, standard, premium } = await extractPricesFromPage(
+          page,
+          captchaPresent,
+          clickCookies,
+          clickModal
+        );
+
+        await page.goBack({ waitUntil: "domcontentloaded" });
+
+        if (basic.length) {
+          finalResult[term] = finalResult[term] || {};
+          finalResult[term]["basic"] = (
+            finalResult[term]["basic"] || []
+          ).concat(basic);
+        }
+        if (standard.length) {
+          finalResult[term] = finalResult[term] || {};
+          finalResult[term]["standard"] = (
+            finalResult[term]["standard"] || []
+          ).concat(standard);
+        }
+        if (premium.length) {
+          finalResult[term] = finalResult[term] || {};
+          finalResult[term]["premium"] = (
+            finalResult[term]["premium"] || []
+          ).concat(premium);
+        }
+
+        console.log(`Finished scraping gig: ${i + 1}`);
+      } catch (err) {
+        console.error(err);
       }
-      // await reactionToPage(page, captchaPresent, clickCookies, clickModal);
-
-      const packageContentExists = await page.$(".package-content");
-      if (!packageContentExists) continue;
-
-      console.log(`getting results for gig`);
-      const { standard, premium } = await extractPricesFromPage(
-        page,
-        captchaPresent,
-        clickCookies,
-        clickModal
-      );
-
-      await page.goBack({ waitUntil: "domcontentloaded" });
-
-      if (standard.length) {
-        finalResult[term] = finalResult[term] || {};
-        finalResult[term][0] = (finalResult[term][0] || []).concat(standard);
-      }
-      if (premium.length) {
-        finalResult[term] = finalResult[term] || {};
-        finalResult[term][1] = (finalResult[term][1] || []).concat(premium);
-      }
-
-      console.log(`Finished scraping gig: ${i + 1}`);
     }
 
     console.log(
@@ -210,12 +237,41 @@ const main = async (term, number) => {
   }
 };
 
-const terms = [`fullstack app`];
+const terms = [
+  "fullstack nextjs",
+  "fullstack nextjs app",
+  "nextjs",
+  "nextjs developer",
+  "nextjs app",
+  "fullstack developer",
+  "fullstack web developer",
+  "react",
+  "react developer",
+  "fullstack react app",
+  "express api",
+  "expressjs api",
+  "api developer",
+  "api development",
+  "frontend developer",
+  "backend developer",
+  "fullstack developer",
+  "fullstack web development",
+  "figma to react",
+  "figma to nextjs",
+  "drizzle orm",
+  "prisma orm",
+  "connect backend to database",
+  "connect website to database",
+  "website database integration",
+];
+
 // `fullstack nextjs`,
 //   `fullstack developer`,
 const runLoop = async () => {
   for (const term of terms) {
-    for (const i of [2]) {
+    const dataInDb = await readJsonFile();
+    if (!!dataInDb[term]) continue;
+    for (const i of [1, 2, 3, 4]) {
       await main(term, i);
     }
   }

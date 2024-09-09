@@ -35,16 +35,26 @@ export const report = async () => {
         `for ${d.length} records of ${key} median is ${medianOfDate}`
       );
     } else {
-      const standard = data[key]["0"].map((price) => {
+      const basic = data[key]["basic"].map((price) => {
         const refinedPrice = price.replace(",", "");
         return +refinedPrice.match(/\d+/)[0];
       });
-      const premium = data[key]["1"].map((price) => {
+      const standard = data[key]["standard"].map((price) => {
         const refinedPrice = price.replace(",", "");
         return +refinedPrice.match(/\d+/)[0];
       });
+      const premium = data[key]["premium"].map((price) => {
+        const refinedPrice = price.replace(",", "");
+        return +refinedPrice.match(/\d+/)[0];
+      });
+      const medianOfbasic = median(basic);
       const medianOfstandard = median(standard);
       const medianOfpremium = median(premium);
+
+      console.log(" ".padStart(30, "*"), key, " ".padEnd(30, "*"));
+      console.log(
+        `for ${basic.length} records of ${key}:standard median is ${medianOfbasic}`
+      );
       console.log(
         `for ${standard.length} records of ${key}:standard median is ${medianOfstandard}`
       );
@@ -54,4 +64,3 @@ export const report = async () => {
     }
   }
 };
-report();

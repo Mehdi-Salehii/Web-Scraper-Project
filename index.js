@@ -2,7 +2,7 @@ import "dotenv/config";
 import puppeteer from "puppeteer-extra";
 
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import median, { report } from "./utils/getMedian.js";
+import median, { report } from "./utils/helpers.js";
 import { environment } from "puppeteer-core/internal/environment.js";
 import { writeObjectToFile } from "./utils/db.js";
 import randomUserAgent from "random-useragent";
