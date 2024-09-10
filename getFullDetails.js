@@ -7,13 +7,14 @@ import { report } from "./utils/helpers.js"; // Ensure this path is correct
 import { executablePath } from "puppeteer";
 import notification from "./utils/soundEffects.js";
 import fs from "fs/promises";
-(async () => {
-  await writeObjectToFile({});
-})();
+// (async () => {
+//   await writeObjectToFile({});
+// })();
 puppeteer.use(StealthPlugin());
 
 let finalResult = {};
 let firstTime = true;
+const numberOfRecords = 3;
 const checkCaptchaPresence = async (page) => {
   const captchaExists = await page.evaluate(() => {
     const pressHoldElement = document.querySelector(
@@ -37,7 +38,20 @@ const navigateTo = async (page, url) => {
     throw error;
   }
 };
-
+const writeReport = async (term) => {
+  const dataInDb = await readJsonFile();
+  if (dataInDb?.[term]?.["basic"]?.length >= numberOfRecords) {
+    const completeSummary = await fs.readFile(
+      "./complete-summary.txt",
+      "utf-8"
+    );
+    if (!completeSummary.includes(term)) {
+      const reportString = await report();
+      await fs.appendFile("./complete-summary.txt", reportString, "utf-8");
+      await writeObjectToFile({});
+    }
+  }
+};
 const extractPricesFromPage = async (page) => {
   const prices = { basic: [], standard: [], premium: [] };
 
@@ -121,6 +135,8 @@ const main = async (term, number) => {
 
     for (let i = 0; i < hrefs.length; i++) {
       try {
+        const dataInDb = await readJsonFile();
+        if (dataInDb?.[term]?.["basic"]?.length >= numberOfRecords) break;
         await new Promise((resolve) =>
           setTimeout(resolve, Math.random() * 15000 + 15000)
         );
@@ -132,13 +148,13 @@ const main = async (term, number) => {
         //   const waitTime = Math.random() * 10 + 10;
         //   await new Promise((res) => setTimeout(res, waitTime * 1000));
         // }
-        let notifPlayed = false;
-        while (await checkCaptchaPresence(page)) {
-          !notifPlayed && notification();
-          notifPlayed = true;
-          console.log("captcha is present waiting for 20 seconds ");
-          await new Promise((res) => setTimeout(res, 20000));
-        }
+        // let notifPlayed = false;
+        // while (await checkCaptchaPresence(page)) {
+        //   !notifPlayed && notification();
+        //   notifPlayed = true;
+        //   console.log("captcha is present waiting for 20 seconds ");
+        //   await new Promise((res) => setTimeout(res, 20000));
+        // }
 
         const packageContentExists = await page.$(".package-content");
         if (!packageContentExists) continue;
@@ -172,13 +188,14 @@ const main = async (term, number) => {
           ).concat(premium);
         }
 
-        console.log(`Finished scraping gig: ${i + 1}`);
         await writeObjectToFile(finalResult);
-        await report();
+        console.log(await report());
+        console.log(`Finished scraping gig: ${i + 1}`);
       } catch (err) {
         console.error(err);
       }
     }
+    await writeReport(term);
 
     console.log(
       `Extracted prices from page ${number} for "${term}":`,
@@ -195,6 +212,8 @@ const main = async (term, number) => {
 };
 
 const terms = [
+  "webscraper",
+  "puppeteer webscraper",
   "fullstack nextjs app",
   "nextjs",
   "nextjs app",
@@ -229,9 +248,15 @@ const runLoop = async () => {
       "./complete-summary.txt",
       "utf-8"
     );
-    if (!!dataInDb[term]) continue;
+
     if (completeSummary.includes(term)) continue;
     for (const i of [1, 2, 3, 4]) {
+      if (completeSummary.includes(term)) break;
+      if (dataInDb?.[term]?.["basic"]?.length >= numberOfRecords) {
+        await writeReport(term);
+
+        break;
+      }
       await main(term, i);
     }
   }

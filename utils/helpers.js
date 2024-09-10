@@ -50,17 +50,30 @@ export const report = async () => {
       const medianOfbasic = median(basic);
       const medianOfstandard = median(standard);
       const medianOfpremium = median(premium);
-
-      console.log(" ".padStart(30, "*"), key, " ".padEnd(30, "*"));
-      console.log(
-        `for ${basic.length} records of ${key}:standard median is ${medianOfbasic}`
-      );
-      console.log(
-        `for ${standard.length} records of ${key}:standard median is ${medianOfstandard}`
-      );
-      console.log(
-        `for ${premium.length} records of ${key}:premium median is ${medianOfpremium}`
+      return (
+        `${"".padStart(30, "*")}${key}${"".padEnd(30, "*")}\n` +
+        `for ${basic.length} records of ${key}:basic median is ${medianOfbasic}\n` +
+        `for ${standard.length} records of ${key}:standard median is ${medianOfstandard}\n` +
+        `for ${premium.length} records of ${key}:premium median is ${medianOfpremium}\n`
       );
     }
   }
+};
+export const sortedReport = async (sortBy = "standard") => {
+  const data = await fs.readFile("./complete-summary.txt", "utf-8");
+
+  const refinedData = data.split(/\n(?=\*+)/).map((d) => {
+    const title = d.match(/(?<=\*\s{2})\D+(?=\s{2}\*)/);
+    const basicMedian = +d.match(/(?<=basic\D+)\d+/);
+    const standardMedian = +d.match(/(?<=standard\D+)\d+/);
+    const premiumMedian = +d.match(/(?<=premium\D+)\d+/);
+    return [`${title}`, basicMedian, standardMedian, premiumMedian];
+  });
+  const dataToShow = {
+    basic: [...refinedData].sort((a, b) => b[1] - a[1]),
+    standard: [...refinedData].sort((a, b) => b[2] - a[2]),
+    premium: [...refinedData].sort((a, b) => b[3] - a[3]),
+  };
+
+  console.log(`sorted by highest ${sortBy} :`, dataToShow[sortBy]);
 };
